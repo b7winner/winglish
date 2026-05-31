@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Winglish — English Learning</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#000);min-height:100vh}
+.screen{display:none;padding:16px;padding-bottom:80px}.screen.active{display:block}
+.header{text-align:center;padding:20px 0 16px}.header h1{font-size:22px;font-weight:700}
+.header p{font-size:14px;color:var(--tg-theme-hint-color,#999);margin-top:4px}
+.card{background:var(--tg-theme-secondary-bg-color,#f5f5f5);border-radius:14px;padding:16px;margin-bottom:12px;cursor:pointer;transition:opacity .15s}.card:active{opacity:.7}
+.card h3{font-size:16px;font-weight:600;margin-bottom:4px}.card p{font-size:14px;color:var(--tg-theme-hint-color,#999)}
+.badge{display:inline-block;font-size:12px;padding:2px 10px;border-radius:10px;margin-top:6px;background:var(--tg-theme-button-color,#2481cc);color:var(--tg-theme-button-text-color,#fff)}
+.badge.green{background:#4caf50}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-size:16px;font-weight:500;cursor:pointer;text-align:center;margin-bottom:10px;background:var(--tg-theme-button-color,#2481cc);color:var(--tg-theme-button-text-color,#fff);transition:opacity .15s}.btn:active{opacity:.7}
+.btn.secondary{background:var(--tg-theme-secondary-bg-color,#e0e0e0);color:var(--tg-theme-text-color,#000)}
+.btn.danger{background:#f44336;color:#fff}
+.btn.small{padding:10px;font-size:14px;display:inline-block;width:auto}
+.nav-bar{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--tg-theme-bg-color,#fff);border-top:1px solid var(--tg-theme-secondary-bg-color,#e0e0e0)}
+.nav-item{flex:1;text-align:center;padding:10px 4px;font-size:11px;cursor:pointer;color:var(--tg-theme-hint-color,#999);transition:color .15s}
+.nav-item.active{color:var(--tg-theme-button-color,#2481cc)}.nav-item .icon{font-size:22px;display:block;margin-bottom:2px}
+.top-bar{display:flex;align-items:center;padding:8px 0 16px;gap:10px}
+.top-bar .back{font-size:24px;cursor:pointer;line-height:1;color:var(--tg-theme-button-color,#2481cc)}
+.top-bar h2{font-size:18px;font-weight:600;flex:1}
+.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center}
+.modal.active{display:flex}.modal-content{background:var(--tg-theme-bg-color,#fff);border-radius:16px;padding:20px;width:90%;max-width:400px;max-height:80vh;overflow-y:auto}
+.modal-content h3{margin-bottom:16px;font-size:18px}
+.form-group{margin-bottom:12px}.form-group label{display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:var(--tg-theme-hint-color,#999)}
+.form-group input,.form-group textarea,.form-group select{width:100%;padding:10px 12px;border:1px solid var(--tg-theme-secondary-bg-color,#ddd);border-radius:10px;font-size:15px;background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#000);font-family:inherit}
+.form-group textarea{min-height:80px;resize:vertical}
+.form-actions{display:flex;gap:8px;margin-top:16px}.form-actions .btn{flex:1;margin:0}
+.q-item{padding:12px;background:var(--tg-theme-secondary-bg-color,#f5f5f5);border-radius:12px;margin-bottom:8px}
+.q-item .q-text{font-weight:500;margin-bottom:4px}.q-item .q-opt{font-size:13px;color:var(--tg-theme-hint-color,#999);margin:2px 0}
+.empty-state{text-align:center;padding:40px 20px;color:var(--tg-theme-hint-color,#999)}.empty-state .icon{font-size:48px;margin-bottom:12px}
+.lesson-content{line-height:1.6;font-size:15px;margin-bottom:16px;white-space:pre-wrap}
+.actions{margin-top:20px}.completed-badge{display:inline-block;padding:4px 12px;border-radius:8px;font-size:13px;font-weight:500;margin-bottom:8px}
+.completed-badge.done{background:#4caf50;color:#fff}.completed-badge.pending{background:var(--tg-theme-secondary-bg-color,#e0e0e0);color:var(--tg-theme-hint-color,#999)}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="screen-home" class="screen active">
+    <div class="header"><h1>📚 Winglish</h1><p>Учи английский с удовольствием</p></div>
+    <div id="home-sections"></div>
+    <div id="home-progress-summary" style="margin-top:12px;font-size:14px;color:var(--tg-theme-hint-color)"></div>
+  </div>
+
+  <div id="screen-lessons" class="screen">
+    <div class="top-bar"><span class="back" onclick="goHome()">‹</span><h2 id="lessons-title">Раздел</h2></div>
+    <div id="lessons-list"></div>
+  </div>
+
+  <div id="screen-lesson" class="screen">
+    <div class="top-bar"><span class="back" onclick="goBack()">‹</span><h2 id="lesson-title">Урок</h2></div>
+    <div class="completed-badge pending" id="lesson-status">Не пройден</div>
+    <div id="lesson-description" style="color:var(--tg-theme-hint-color);margin-bottom:8px"></div>
+    <div class="lesson-content" id="lesson-content"></div>
+    <div class="actions" id="lesson-actions"></div>
+  </div>
+
+  <div id="screen-admin" class="screen">
+    <div class="top-bar"><span class="back" onclick="goHome()">‹</span><h2>⚙️ Управление</h2></div>
+    <div id="admin-sections"></div>
+    <button class="btn" onclick="showSectionForm()">➕ Добавить раздел</button>
+  </div>
+
+  <div id="screen-admin-lessons" class="screen">
+    <div class="top-bar"><span class="back" onclick="navigate('admin')">‹</span><h2 id="admin-lessons-title">Уроки</h2></div>
+    <div id="admin-lessons-list"></div>
+    <button class="btn" onclick="showLessonForm()">➕ Добавить урок</button>
+  </div>
+
+  <div id="screen-admin-quiz" class="screen">
+    <div class="top-bar"><span class="back" onclick="navigate('admin')">‹</span><h2 id="admin-quiz-title">Тест</h2></div>
+    <div id="admin-questions-list"></div>
+    <button class="btn" onclick="showQuestionForm()">➕ Добавить вопрос</button>
+  </div>
+
+  <nav class="nav-bar">
+    <div class="nav-item active" onclick="navigate('home')"><span class="icon">📚</span>Разделы</div>
+    <div class="nav-item" onclick="navigate('progress')"><span class="icon">📊</span>Прогресс</div>
+    <div class="nav-item" id="nav-admin" onclick="navigate('admin')" style="display:none"><span class="icon">⚙️</span>Админка</div>
+  </nav>
+</div>
+
+<div class="modal" id="modalSection"><div class="modal-content">
+  <h3 id="modal-section-title">Новый раздел</h3>
+  <div class="form-group"><label>Название</label><input id="f-section-title" placeholder="Например: Grammar"></div>
+  <div class="form-group"><label>Описание</label><textarea id="f-section-desc" placeholder="Описание раздела"></textarea></div>
+  <div class="form-group"><label>Иконка (эмодзи)</label><input id="f-section-icon" value="📚" maxlength="2"></div>
+  <div class="form-actions">
+    <button class="btn secondary" onclick="closeModal('modalSection')">Отмена</button>
+    <button class="btn" id="btn-section-save" onclick="saveSection()">Сохранить</button>
+  </div>
+</div></div>
+
+<div class="modal" id="modalLesson"><div class="modal-content">
+  <h3 id="modal-lesson-title">Новый урок</h3>
+  <div class="form-group"><label>Название</label><input id="f-lesson-title" placeholder="Например: Present Simple"></div>
+  <div class="form-group"><label>Описание</label><input id="f-lesson-desc" placeholder="Краткое описание"></div>
+  <div class="form-group"><label>Текст урока</label><textarea id="f-lesson-content" placeholder="Текст урока..."></textarea></div>
+  <div class="form-group"><label>YouTube ссылка</label><input id="f-lesson-video" placeholder="https://youtube.com/watch?v=..."></div>
+  <div class="form-actions">
+    <button class="btn secondary" onclick="closeModal('modalLesson')">Отмена</button>
+    <button class="btn" id="btn-lesson-save" onclick="saveLesson()">Сохранить</button>
+  </div>
+</div></div>
+
+<div class="modal" id="modalQuestion"><div class="modal-content">
+  <h3>Новый вопрос</h3>
+  <div class="form-group"><label>Вопрос</label><input id="f-q-text" placeholder="Текст вопроса"></div>
+  <div class="form-group"><label>Варианты (каждый с новой строки)</label><textarea id="f-q-options" placeholder="Apple&#10;Banana&#10;Orange" rows="4"></textarea></div>
+  <div class="form-group"><label>Номер правильного ответа (0 — первый)</label><input id="f-q-correct" value="0" placeholder="0"></div>
+  <div class="form-group"><label>Объяснение</label><textarea id="f-q-expl" placeholder="Почему этот ответ правильный?" rows="2"></textarea></div>
+  <div class="form-actions">
+    <button class="btn secondary" onclick="closeModal('modalQuestion')">Отмена</button>
+    <button class="btn" onclick="saveQuestion()">Сохранить</button>
+  </div>
+</div></div>
+
+<script>
+Telegram.WebApp.ready();
+Telegram.WebApp.expand();
+
+const user = Telegram.WebApp.initDataUnsafe.user || {};
+const userId = String(user.id || '');
+const isAdmin = userId === '7153815329';
+const API = window.location.origin;
+
+if (isAdmin) document.getElementById('nav-admin').style.display = 'block';
+
+let currentSectionId = null;
+let currentLessonId = null;
+let editingSectionId = null;
+let editingLessonId = null;
+
+// ─── Routing ─────────────────────────────────────────────────────
+
+function navigate(screen, data) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + screen).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navItem = document.querySelector(`.nav-item[onclick*="${screen}"]`);
+  if (navItem) navItem.classList.add('active');
+  if (screen === 'home') loadHome();
+  else if (screen === 'lessons') loadLessons(data);
+  else if (screen === 'lesson') loadLesson(data);
+  else if (screen === 'progress') loadProgress();
+  else if (screen === 'admin') loadAdmin();
+  else if (screen === 'admin-lessons') loadAdminLessons(data);
+  else if (screen === 'admin-quiz') loadAdminQuiz(data);
+}
+
+function goHome() { navigate('home'); }
+function goBack() {
+  if (document.getElementById('screen-lesson').classList.contains('active'))
+    navigate('lessons', currentSectionId);
+  else navigate('home');
+}
+
+// ─── API ─────────────────────────────────────────────────────────
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...opts.headers };
+  if (userId) headers['X-User-Id'] = userId;
+  const res = await fetch(API + path, { ...opts, headers });
+  if (!res.ok) throw new Error(res.statusText);
+  return res.json();
+}
+
+// ─── Home ────────────────────────────────────────────────────────
+
+async function loadHome() {
+  try {
+    const [sections, progress] = await Promise.all([
+      api('/api/sections'),
+      userId ? api(`/api/progress?user_id=${userId}`) : { total_lessons:0, completed:0, total_score:0 },
+    ]);
+    const container = document.getElementById('home-sections');
+    container.innerHTML = sections.map(s => `
+      <div class="card" onclick="navigate('lessons',${s.id})">
+        <h3>${s.icon || '📚'} ${s.title}</h3>
+        ${s.description ? `<p>${escapeHtml(s.description)}</p>` : ''}
+      </div>
+    `).join('');
+    document.getElementById('home-progress-summary').textContent =
+      `📊 Пройдено ${progress.completed}/${progress.total_lessons} уроков · ⭐ ${progress.total_score} баллов`;
+  } catch (e) { console.error(e); }
+}
+
+// ─── Lessons ─────────────────────────────────────────────────────
+
+async function loadLessons(sectionId) {
+  currentSectionId = sectionId;
+  try {
+    const sections = await api('/api/sections');
+    const section = sections.find(s => s.id === sectionId);
+    document.getElementById('lessons-title').textContent = (section ? section.icon + ' ' : '') + (section ? section.title : 'Раздел');
+    const lessons = await api(`/api/sections/${sectionId}/lessons?user_id=${userId}`);
+    document.getElementById('lessons-list').innerHTML = lessons.map(l => `
+      <div class="card" onclick="navigate('lesson',${l.id})">
+        <h3>${l.title}</h3>
+        ${l.description ? `<p>${escapeHtml(l.description)}</p>` : ''}
+        ${l.completed ? '<span class="badge green">✅ Пройдено</span>' : ''}
+        ${!l.has_quiz ? '<span class="badge">Нет теста</span>' : ''}
+      </div>
+    `).join('');
+  } catch (e) { console.error(e); }
+}
+
+// ─── Lesson Detail ───────────────────────────────────────────────
+
+async function loadLesson(lessonId) {
+  currentLessonId = lessonId;
+  try {
+    const lesson = await api(`/api/lessons/${lessonId}`);
+    document.getElementById('lesson-title').textContent = lesson.title;
+    document.getElementById('lesson-description').textContent = lesson.description || '';
+    document.getElementById('lesson-content').textContent = lesson.content_text || '';
+    const status = document.getElementById('lesson-status');
+    if (lesson.questions_count > 0) {
+      const prog = userId ? await api(`/api/progress?user_id=${userId}`) : {};
+      const done = prog.completed || false;
+      status.className = 'completed-badge ' + (done ? 'done' : 'pending');
+      status.textContent = done ? '✅ Пройдено' : '⏳ Не пройден';
+    } else {
+      status.className = 'completed-badge pending';
+      status.textContent = '📝 Нет теста';
+    }
+    const actions = document.getElementById('lesson-actions');
+    let html = '';
+    if (lesson.video_url) {
+      html += `<button class="btn" onclick="window.open('${API}/webapp/player?lesson_id=${lessonId}')">🎬 Смотреть видео</button>`;
+    }
+    if (lesson.video_file_id) {
+      html += `<button class="btn" onclick="window.open('${API}/webapp/player?lesson_id=${lessonId}')">🎬 Смотреть видео (файл)</button>`;
+    }
+    if (lesson.questions_count > 0) {
+      html += `<button class="btn" onclick="window.open('${API}/webapp/quiz?lesson_id=${lessonId}')">📝 Пройти тест</button>`;
+    }
+    actions.innerHTML = html;
+  } catch (e) { console.error(e); }
+}
+
+// ─── Progress ────────────────────────────────────────────────────
+
+async function loadProgress() {
+  if (!userId) {
+    document.getElementById('screen-progress').innerHTML =
+      '<div class="header"><h1>📊 Прогресс</h1></div><div class="empty-state"><div class="icon">👤</div><p>Авторизуйся через Telegram</p></div>';
+    return;
+  }
+  try {
+    const [progress, sections] = await Promise.all([
+      api(`/api/progress?user_id=${userId}`),
+      api('/api/sections'),
+    ]);
+    let html = '<div class="header"><h1>📊 Мой прогресс</h1></div>';
+    html += `<div style="text-align:center;padding:16px 0">
+      <div style="font-size:36px;font-weight:700">${progress.total_score}</div>
+      <div style="font-size:14px;color:var(--tg-theme-hint-color)">всего баллов</div>
+      <div style="margin-top:8px">✅ ${progress.completed} / ${progress.total_lessons} уроков</div>
+    </div>`;
+    for (const s of sections) {
+      const lessons = await api(`/api/sections/${s.id}/lessons?user_id=${userId}`);
+      const done = lessons.filter(l => l.completed).length;
+      html += `<div class="card" style="cursor:default">
+        <h3>${s.icon} ${s.title}</h3>
+        <p>✅ ${done}/${lessons.length} уроков</p>
+      </div>`;
+    }
+    document.getElementById('screen-progress').innerHTML = html;
+  } catch (e) { console.error(e); }
+}
+
+// ─── Admin: Sections ─────────────────────────────────────────────
+
+async function loadAdmin() {
+  if (!isAdmin) return;
+  try {
+    const sections = await api('/api/sections');
+    document.getElementById('admin-sections').innerHTML = sections.map(s => `
+      <div class="card" style="cursor:default">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3>${s.icon} ${s.title}</h3>
+          <div>
+            <button class="btn small secondary" onclick="editSection(${s.id})">✏️</button>
+            <button class="btn small danger" onclick="deleteSection(${s.id})">✕</button>
+          </div>
+        </div>
+        <p>${escapeHtml(s.description || '')}</p>
+        <button class="btn small" style="margin-top:8px;width:100%" onclick="navigate('admin-lessons',${s.id})">📋 Уроки</button>
+      </div>
+    `).join('');
+  } catch (e) { console.error(e); }
+}
+
+function showSectionForm(data) {
+  editingSectionId = data ? data.id : null;
+  document.getElementById('modal-section-title').textContent = data ? 'Редактировать раздел' : 'Новый раздел';
+  document.getElementById('f-section-title').value = data ? data.title : '';
+  document.getElementById('f-section-desc').value = data ? (data.description || '') : '';
+  document.getElementById('f-section-icon').value = data ? (data.icon || '📚') : '📚';
+  document.getElementById('btn-section-save').textContent = data ? 'Сохранить' : 'Создать';
+  openModal('modalSection');
+}
+
+function editSection(id) {
+  api('/api/sections').then(sections => {
+    const s = sections.find(x => x.id === id);
+    if (s) showSectionForm(s);
+  });
+}
+
+async function saveSection() {
+  const title = document.getElementById('f-section-title').value.trim();
+  if (!title) return;
+  const body = {
+    title,
+    description: document.getElementById('f-section-desc').value.trim(),
+    icon: document.getElementById('f-section-icon').value.trim() || '📚',
+  };
+  try {
+    if (editingSectionId) {
+      await api(`/api/admin/sections/${editingSectionId}`, { method: 'PUT', body: JSON.stringify(body) });
+    } else {
+      await api('/api/admin/sections', { method: 'POST', body: JSON.stringify(body) });
+    }
+    closeModal('modalSection');
+    loadAdmin();
+  } catch (e) { console.error(e); }
+}
+
+async function deleteSection(id) {
+  if (!confirm('Удалить раздел? Все уроки будут удалены!')) return;
+  await api(`/api/admin/sections/${id}`, { method: 'DELETE' });
+  loadAdmin();
+}
+
+// ─── Admin: Lessons ─────────────────────────────────────────────
+
+async function loadAdminLessons(sectionId) {
+  currentSectionId = sectionId;
+  try {
+    const sections = await api('/api/sections');
+    const section = sections.find(s => s.id === sectionId);
+    document.getElementById('admin-lessons-title').textContent = 'Уроки: ' + (section ? section.title : '');
+    const lessons = await api(`/api/sections/${sectionId}/lessons`);
+    document.getElementById('admin-lessons-list').innerHTML = lessons.map(l => `
+      <div class="card" style="cursor:default">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3>${l.title}</h3>
+          <div>
+            <button class="btn small secondary" onclick="editLesson(${l.id})">✏️</button>
+            <button class="btn small danger" onclick="deleteLesson(${l.id})">✕</button>
+          </div>
+        </div>
+        <p>${escapeHtml(l.description || '')}</p>
+        <button class="btn small" style="margin-top:8px;width:100%" onclick="navigate('admin-quiz',${l.id})">📝 Тест (${l.has_quiz ? 'есть' : 'нет'})</button>
+      </div>
+    `).join('');
+  } catch (e) { console.error(e); }
+}
+
+function showLessonForm(data) {
+  editingLessonId = data ? data.id : null;
+  document.getElementById('modal-lesson-title').textContent = data ? 'Редактировать урок' : 'Новый урок';
+  document.getElementById('f-lesson-title').value = data ? data.title : '';
+  document.getElementById('f-lesson-desc').value = data ? (data.description || '') : '';
+  document.getElementById('f-lesson-content').value = data ? (data.content_text || '') : '';
+  document.getElementById('f-lesson-video').value = data ? (data.video_url || '') : '';
+  document.getElementById('btn-lesson-save').textContent = data ? 'Сохранить' : 'Создать';
+  openModal('modalLesson');
+}
+
+function editLesson(id) {
+  api(`/api/lessons/${id}`).then(l => showLessonForm(l));
+}
+
+async function saveLesson() {
+  const title = document.getElementById('f-lesson-title').value.trim();
+  if (!title) return;
+  const body = {
+    section_id: currentSectionId,
+    title,
+    description: document.getElementById('f-lesson-desc').value.trim(),
+    content_text: document.getElementById('f-lesson-content').value.trim(),
+    video_url: document.getElementById('f-lesson-video').value.trim(),
+  };
+  try {
+    if (editingLessonId) {
+      await api(`/api/admin/lessons/${editingLessonId}`, { method: 'PUT', body: JSON.stringify(body) });
+    } else {
+      await api('/api/admin/lessons', { method: 'POST', body: JSON.stringify(body) });
+    }
+    closeModal('modalLesson');
+    loadAdminLessons(currentSectionId);
+  } catch (e) { console.error(e); }
+}
+
+async function deleteLesson(id) {
+  if (!confirm('Удалить урок?')) return;
+  await api(`/api/admin/lessons/${id}`, { method: 'DELETE' });
+  loadAdminLessons(currentSectionId);
+}
+
+// ─── Admin: Quiz ────────────────────────────────────────────────
+
+async function loadAdminQuiz(lessonId) {
+  currentLessonId = lessonId;
+  try {
+    const lesson = await api(`/api/lessons/${lessonId}`);
+    document.getElementById('admin-quiz-title').textContent = 'Тест: ' + lesson.title;
+    const questions = await api(`/api/lessons/${lessonId}/questions`);
+    document.getElementById('admin-questions-list').innerHTML = questions.map((q, i) => `
+      <div class="q-item">
+        <div class="q-text">${i+1}. ${escapeHtml(q.question_text)}</div>
+        ${q.options.map((o, j) => `<div class="q-opt">${j === q.correct_answer ? '✅' : ''} ${escapeHtml(o)}</div>`).join('')}
+        ${q.explanation ? `<div class="q-opt" style="margin-top:4px;font-style:italic">💡 ${escapeHtml(q.explanation)}</div>` : ''}
+        <button class="btn small danger" style="margin-top:8px" onclick="deleteQuestion(${q.id})">Удалить</button>
+      </div>
+    `).join('');
+  } catch (e) { console.error(e); }
+}
+
+function showQuestionForm() {
+  document.getElementById('f-q-text').value = '';
+  document.getElementById('f-q-options').value = '';
+  document.getElementById('f-q-correct').value = '0';
+  document.getElementById('f-q-expl').value = '';
+  openModal('modalQuestion');
+}
+
+async function saveQuestion() {
+  const text = document.getElementById('f-q-text').value.trim();
+  const optionsRaw = document.getElementById('f-q-options').value.trim();
+  const correct = parseInt(document.getElementById('f-q-correct').value);
+  if (!text || !optionsRaw) return;
+  const options = optionsRaw.split('\n').map(s => s.trim()).filter(Boolean);
+  if (options.length < 2) return;
+  try {
+    await api('/api/admin/questions', {
+      method: 'POST',
+      body: JSON.stringify({
+        lesson_id: currentLessonId,
+        question_text: text,
+        options,
+        correct_answer: correct,
+        explanation: document.getElementById('f-q-expl').value.trim(),
+      }),
+    });
+    closeModal('modalQuestion');
+    loadAdminQuiz(currentLessonId);
+  } catch (e) { console.error(e); }
+}
+
+async function deleteQuestion(id) {
+  if (!confirm('Удалить вопрос?')) return;
+  await api(`/api/admin/questions/${id}`, { method: 'DELETE' });
+  loadAdminQuiz(currentLessonId);
+}
+
+// ─── Modals ──────────────────────────────────────────────────────
+
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// ─── Utils ───────────────────────────────────────────────────────
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ─── Init ────────────────────────────────────────────────────────
+
+loadHome();
+</script>
+</body>
+</html>
