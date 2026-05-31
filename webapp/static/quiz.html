@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{LESSON_TITLE}} — Тест</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--tg-theme-bg-color, #fff);
+            color: var(--tg-theme-text-color, #000);
+            padding: 16px;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            padding: 12px 0 20px;
+        }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .header .progress-text {
+            font-size: 14px;
+            color: var(--tg-theme-hint-color, #999);
+            margin-top: 4px;
+        }
+        .progress-bar {
+            height: 4px;
+            background: var(--tg-theme-secondary-bg-color, #e0e0e0);
+            border-radius: 2px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        .progress-bar .fill {
+            height: 100%;
+            background: var(--tg-theme-button-color, #2481cc);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .question {
+            margin-bottom: 24px;
+        }
+        .question h2 {
+            font-size: 17px;
+            font-weight: 500;
+            line-height: 1.4;
+            margin-bottom: 16px;
+        }
+        .option {
+            display: block;
+            width: 100%;
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.15s;
+            color: var(--tg-theme-text-color, #000);
+        }
+        .option:hover { opacity: 0.85; }
+        .option.selected {
+            border-color: var(--tg-theme-button-color, #2481cc);
+            background: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-text-color, #fff);
+        }
+        .option.correct {
+            border-color: #4caf50;
+            background: #4caf50;
+            color: #fff;
+        }
+        .option.wrong {
+            border-color: #f44336;
+            background: #f44336;
+            color: #fff;
+        }
+        .option.disabled {
+            cursor: default;
+            opacity: 0.7;
+        }
+        .explanation {
+            padding: 12px 16px;
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            border-radius: 12px;
+            margin: 8px 0 16px;
+            font-size: 14px;
+            line-height: 1.4;
+            color: var(--tg-theme-hint-color, #666);
+            display: none;
+        }
+        .explanation.visible { display: block; }
+        .next-btn {
+            display: none;
+            width: 100%;
+            padding: 14px;
+            background: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-text-color, #fff);
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+            margin-top: 8px;
+        }
+        .next-btn.visible { display: block; }
+        .result {
+            text-align: center;
+            padding: 40px 20px;
+            display: none;
+        }
+        .result.visible { display: block; }
+        .result .score {
+            font-size: 48px;
+            font-weight: 700;
+            margin: 16px 0;
+        }
+        .result .score-label {
+            font-size: 18px;
+            color: var(--tg-theme-hint-color, #999);
+        }
+        .result .status {
+            font-size: 24px;
+            margin: 16px 0;
+        }
+        .result-btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-text-color, #fff);
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+            margin-top: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div id="quizApp">
+        <div class="header">
+            <h1>{{LESSON_TITLE}}</h1>
+            <div class="progress-text" id="progressText">Вопрос <span id="currentQ">1</span> из <span id="totalQ">0</span></div>
+        </div>
+        <div class="progress-bar">
+            <div class="fill" id="progressFill"></div>
+        </div>
+
+        <div id="questionArea">
+            <div class="question">
+                <h2 id="questionText">Загрузка...</h2>
+                <div id="optionsContainer"></div>
+                <div class="explanation" id="explanation"></div>
+                <button class="next-btn" id="nextBtn">Далее →</button>
+            </div>
+        </div>
+
+        <div class="result" id="resultArea">
+            <div class="status" id="resultStatus"></div>
+            <div class="score" id="resultScore">0/0</div>
+            <div class="score-label">правильных ответов</div>
+            <button class="result-btn" onclick="finishQuiz()">✅ Завершить тест</button>
+        </div>
+    </div>
+
+    <script>
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+
+        const LESSON_ID = parseInt('{{LESSON_ID}}');
+        const API_URL = '{{API_URL}}';
+
+        let questions = [];
+        let currentIndex = 0;
+        let answers = [];
+        let answered = false;
+
+        async function loadQuestions() {
+            try {
+                const res = await fetch(`${API_URL}/api/lessons/${LESSON_ID}/questions`);
+                const data = await res.json();
+                if (!Array.isArray(data) || data.length === 0) {
+                    document.getElementById('questionText').textContent = 'Нет вопросов для этого урока.';
+                    return;
+                }
+                questions = data;
+                document.getElementById('totalQ').textContent = questions.length;
+                showQuestion(0);
+            } catch (e) {
+                document.getElementById('questionText').textContent = 'Ошибка загрузки вопросов.';
+            }
+        }
+
+        function showQuestion(index) {
+            answered = false;
+            const q = questions[index];
+            document.getElementById('currentQ').textContent = index + 1;
+            document.getElementById('progressFill').style.width = `${(index / questions.length) * 100}%`;
+            document.getElementById('questionText').textContent = q.question_text;
+
+            const container = document.getElementById('optionsContainer');
+            container.innerHTML = '';
+            q.options.forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'option';
+                btn.textContent = opt;
+                btn.dataset.index = i;
+                btn.onclick = () => selectOption(i);
+                container.appendChild(btn);
+            });
+
+            document.getElementById('explanation').className = 'explanation';
+            document.getElementById('explanation').textContent = '';
+            document.getElementById('nextBtn').className = 'next-btn';
+        }
+
+        function selectOption(index) {
+            if (answered) return;
+            answered = true;
+
+            const q = questions[currentIndex];
+            const buttons = document.querySelectorAll('.option');
+            buttons.forEach((btn, i) => {
+                btn.classList.add('disabled');
+                if (i === q.correct_answer) {
+                    btn.classList.add('correct');
+                } else if (i === index && index !== q.correct_answer) {
+                    btn.classList.add('wrong');
+                }
+                btn.onclick = null;
+            });
+
+            answers.push({
+                question_id: q.id,
+                selected: index,
+                correct: index === q.correct_answer,
+            });
+
+            const exp = document.getElementById('explanation');
+            if (q.explanation) {
+                exp.textContent = '💡 ' + q.explanation;
+                exp.className = 'explanation visible';
+            }
+
+            const nextBtn = document.getElementById('nextBtn');
+            if (currentIndex < questions.length - 1) {
+                nextBtn.textContent = 'Далее →';
+                nextBtn.className = 'next-btn visible';
+                nextBtn.onclick = () => {
+                    currentIndex++;
+                    showQuestion(currentIndex);
+                };
+            } else {
+                nextBtn.textContent = '📊 Посмотреть результат';
+                nextBtn.className = 'next-btn visible';
+                nextBtn.onclick = showResult;
+            }
+        }
+
+        function showResult() {
+            document.getElementById('questionArea').style.display = 'none';
+            document.getElementById('progressFill').style.width = '100%';
+
+            const correct = answers.filter(a => a.correct).length;
+            const total = questions.length;
+            const passed = correct >= total / 2;
+
+            document.getElementById('resultScore').textContent = `${correct} / ${total}`;
+            document.getElementById('resultStatus').textContent = passed ? '✅ Отлично!' : '❌ Попробуйте ещё раз';
+            document.getElementById('resultArea').className = 'result visible';
+        }
+
+        function finishQuiz() {
+            const correct = answers.filter(a => a.correct).length;
+            const total = questions.length;
+            Telegram.WebApp.sendData(JSON.stringify({
+                lesson_id: LESSON_ID,
+                score: correct,
+                total: total,
+                answers: answers,
+            }));
+        }
+
+        loadQuestions();
+    </script>
+</body>
+</html>
