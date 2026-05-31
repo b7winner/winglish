@@ -22,7 +22,7 @@ async def root():
         "status": "running",
         "version": "1.0.0",
         "endpoints": {
-            "bot": "https://t.me/your_bot_username",
+            "bot": "https://t.me/bigwinglishbot",
             "webapp_player": "/webapp/player?lesson_id=X",
             "webapp_quiz": "/webapp/quiz?lesson_id=X",
             "api_sections": "/api/sections",
