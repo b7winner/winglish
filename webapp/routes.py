@@ -6,6 +6,7 @@ from pathlib import Path
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 from fastapi import FastAPI, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,7 +31,14 @@ async def start_bot():
     dp.include_router(router)
     logger.info("Starting bot polling...")
     _polling_task = asyncio.create_task(dp.start_polling(_bot))
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(1)
+    try:
+        await _bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="📚 Winglish", web_app=WebAppInfo(url=f"{APP_URL}/webapp/app"))
+        )
+        logger.info("Menu button set")
+    except Exception as e:
+        logger.warning(f"Failed to set menu button: {e}")
 
 
 async def stop_bot():
