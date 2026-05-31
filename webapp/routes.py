@@ -62,7 +62,17 @@ app = FastAPI(title="Winglish — English Learning", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
-# ─── Health ──────────────────────────────────────────────────────
+# ─── Root & Health ──────────────────────────────────────────────
+
+@app.get("/")
+async def root():
+    return {
+        "app": "Winglish — English Learning Bot",
+        "status": "running",
+        "bot": "https://t.me/bigwinglishbot",
+        "webapp": "/webapp/app",
+    }
+
 
 @app.get("/ping")
 async def ping():
