@@ -1,15 +1,64 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
+from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from fastapi import FastAPI, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from config import APP_URL, ADMIN_ID
-from database import async_session, Session, User, Section, Lesson, Question, UserProgress
+from config import APP_URL, ADMIN_ID, BOT_TOKEN
+from database import async_session, init_db, Section, Lesson, Question, UserProgress
 
+logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(title="Winglish — English Learning")
+# ─── Bot setup ───────────────────────────────────────────────────
+
+_bot: Bot | None = None
+_polling_task: asyncio.Task | None = None
+
+
+async def start_bot():
+    global _bot, _polling_task
+    _bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    dp = Dispatcher()
+    from bot.handlers import router
+    dp.include_router(router)
+    logger.info("Starting bot polling...")
+    _polling_task = asyncio.create_task(dp.start_polling(_bot))
+    await asyncio.sleep(0.5)
+
+
+async def stop_bot():
+    global _bot, _polling_task
+    if _polling_task:
+        _polling_task.cancel()
+        try:
+            await _polling_task
+        except asyncio.CancelledError:
+            pass
+    if _bot:
+        await _bot.session.close()
+    logger.info("Bot stopped.")
+
+
+# ─── Lifespan ────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    asyncio.create_task(start_bot())
+    yield
+    await stop_bot()
+
+
+# ─── FastAPI app ─────────────────────────────────────────────────
+
+app = FastAPI(title="Winglish — English Learning", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -24,10 +73,6 @@ async def ping():
 
 def get_user_id(request: Request) -> str:
     return request.query_params.get("user_id") or request.headers.get("X-User-Id", "")
-
-
-def is_admin_user(request: Request) -> bool:
-    return get_user_id(request) == ADMIN_ID
 
 
 # ─── Public API ──────────────────────────────────────────────────
@@ -74,12 +119,11 @@ async def api_lesson(lesson_id: int):
         lesson = await session.get(Lesson, lesson_id)
         if not lesson:
             return JSONResponse({"error": "Lesson not found"}, status_code=404)
-        questions_count = len(lesson.questions)
         return {
             "id": lesson.id, "title": lesson.title,
             "description": lesson.description, "content_text": lesson.content_text,
             "video_url": lesson.video_url, "video_file_id": lesson.video_file_id,
-            "questions_count": questions_count,
+            "questions_count": len(lesson.questions),
         }
 
 
@@ -121,13 +165,6 @@ async def api_progress(user_id: str = Query("")):
 
 # ─── Admin API ───────────────────────────────────────────────────
 
-async def check_admin(request: Request):
-    uid = get_user_id(request)
-    if uid != ADMIN_ID:
-        return JSONResponse({"error": "Forbidden"}, status_code=403)
-    return None
-
-
 @app.post("/api/admin/sections")
 async def admin_create_section(request: Request):
     uid = get_user_id(request)
@@ -135,11 +172,7 @@ async def admin_create_section(request: Request):
         return JSONResponse({"error": "Forbidden"}, status_code=403)
     body = await request.json()
     async with async_session() as session:
-        section = Section(
-            title=body["title"],
-            description=body.get("description", ""),
-            icon=body.get("icon", "📚"),
-        )
+        section = Section(title=body["title"], description=body.get("description", ""), icon=body.get("icon", "📚"))
         session.add(section)
         await session.commit()
         return {"id": section.id, "title": section.title, "icon": section.icon}
@@ -155,12 +188,9 @@ async def admin_update_section(section_id: int, request: Request):
         section = await session.get(Section, section_id)
         if not section:
             return JSONResponse({"error": "Not found"}, status_code=404)
-        if "title" in body:
-            section.title = body["title"]
-        if "description" in body:
-            section.description = body["description"]
-        if "icon" in body:
-            section.icon = body["icon"]
+        for field in ("title", "description", "icon"):
+            if field in body:
+                setattr(section, field, body[field])
         await session.commit()
         return {"id": section.id, "title": section.title, "icon": section.icon}
 
@@ -186,12 +216,9 @@ async def admin_create_lesson(request: Request):
     body = await request.json()
     async with async_session() as session:
         lesson = Lesson(
-            section_id=body["section_id"],
-            title=body["title"],
-            description=body.get("description", ""),
-            content_text=body.get("content_text", ""),
-            video_url=body.get("video_url", ""),
-            video_file_id=body.get("video_file_id", ""),
+            section_id=body["section_id"], title=body["title"],
+            description=body.get("description", ""), content_text=body.get("content_text", ""),
+            video_url=body.get("video_url", ""), video_file_id=body.get("video_file_id", ""),
         )
         session.add(lesson)
         await session.commit()
@@ -236,15 +263,13 @@ async def admin_create_question(request: Request):
     body = await request.json()
     async with async_session() as session:
         q = Question(
-            lesson_id=body["lesson_id"],
-            question_text=body["question_text"],
-            options=body["options"],
-            correct_answer=body["correct_answer"],
+            lesson_id=body["lesson_id"], question_text=body["question_text"],
+            options=body["options"], correct_answer=body["correct_answer"],
             explanation=body.get("explanation", ""),
         )
         session.add(q)
         await session.commit()
-        return {"id": q.id, "question_text": q.question_text}
+        return {"id": q.id}
 
 
 @app.delete("/api/admin/questions/{question_id}")
@@ -260,32 +285,10 @@ async def admin_delete_question(question_id: int, request: Request):
     return {"ok": True}
 
 
-@app.post("/api/admin/questions/batch")
-async def admin_create_questions_batch(request: Request):
-    uid = get_user_id(request)
-    if uid != ADMIN_ID:
-        return JSONResponse({"error": "Forbidden"}, status_code=403)
-    body = await request.json()
-    lesson_id = body.get("lesson_id")
-    questions_data = body.get("questions", [])
-    async with async_session() as session:
-        for qd in questions_data:
-            q = Question(
-                lesson_id=lesson_id,
-                question_text=qd["question_text"],
-                options=qd["options"],
-                correct_answer=qd["correct_answer"],
-                explanation=qd.get("explanation", ""),
-            )
-            session.add(q)
-        await session.commit()
-    return {"ok": True, "count": len(questions_data)}
-
-
 # ─── WebApp Pages ────────────────────────────────────────────────
 
 @app.get("/webapp/app")
-async def webapp_app(request: Request):
+async def webapp_app():
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
     return HTMLResponse(html)
 
