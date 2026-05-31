@@ -399,7 +399,7 @@ async function saveLesson() {
     }
     closeModal('modalLesson');
     loadAdminLessons(currentSectionId);
-  } catch (e) { console.error(e); }
+  } catch (e) { alert('Ошибка: ' + e.message); }
 }
 
 async function deleteLesson(id) {

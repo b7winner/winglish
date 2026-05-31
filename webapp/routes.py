@@ -109,12 +109,16 @@ async def api_sections():
 
 @app.get("/api/sections/{section_id}/lessons")
 async def api_lessons(section_id: int, user_id: str = Query("")):
-    from sqlalchemy import select
+    from sqlalchemy import select, func
     async with async_session() as session:
-        result = await session.execute(
-            select(Lesson).where(Lesson.section_id == section_id).order_by(Lesson.order, Lesson.id)
+        lessons = await session.execute(
+            select(Lesson, func.count(Question.id).label("q_count"))
+            .outerjoin(Question, Question.lesson_id == Lesson.id)
+            .where(Lesson.section_id == section_id)
+            .group_by(Lesson.id)
+            .order_by(Lesson.order, Lesson.id)
         )
-        lessons = result.scalars().all()
+        rows = lessons.all()
         completed_ids = set()
         if user_id:
             prog_result = await session.execute(
@@ -126,22 +130,30 @@ async def api_lessons(section_id: int, user_id: str = Query("")):
             completed_ids = {p.lesson_id for p in prog_result.scalars().all()}
     return [
         {"id": l.id, "title": l.title, "description": l.description,
-         "completed": l.id in completed_ids, "has_quiz": len(l.questions) > 0}
-        for l in lessons
+         "completed": l.id in completed_ids, "has_quiz": q_count > 0}
+        for l, q_count in rows
     ]
 
 
 @app.get("/api/lessons/{lesson_id}")
 async def api_lesson(lesson_id: int):
+    from sqlalchemy import select, func
     async with async_session() as session:
-        lesson = await session.get(Lesson, lesson_id)
-        if not lesson:
+        result = await session.execute(
+            select(Lesson, func.count(Question.id).label("q_count"))
+            .outerjoin(Question, Question.lesson_id == Lesson.id)
+            .where(Lesson.id == lesson_id)
+            .group_by(Lesson.id)
+        )
+        row = result.one_or_none()
+        if not row:
             return JSONResponse({"error": "Lesson not found"}, status_code=404)
+        lesson, q_count = row
         return {
             "id": lesson.id, "title": lesson.title,
             "description": lesson.description, "content_text": lesson.content_text,
             "video_url": lesson.video_url, "video_file_id": lesson.video_file_id,
-            "questions_count": len(lesson.questions),
+            "questions_count": q_count,
         }
 
 
