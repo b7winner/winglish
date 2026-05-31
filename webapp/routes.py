@@ -13,6 +13,31 @@ app = FastAPI(title="English Learning WebApp")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+# ─── Root & Health ──────────────────────────────────────────────
+
+@app.get("/")
+async def root():
+    return {
+        "app": "Winglish — English Learning Bot",
+        "status": "running",
+        "version": "1.0.0",
+        "endpoints": {
+            "bot": "https://t.me/your_bot_username",
+            "webapp_player": "/webapp/player?lesson_id=X",
+            "webapp_quiz": "/webapp/quiz?lesson_id=X",
+            "api_sections": "/api/sections",
+            "api_lessons": "/api/sections/{id}/lessons",
+            "api_questions": "/api/lessons/{id}/questions",
+            "health": "/ping",
+        },
+    }
+
+
+@app.get("/ping")
+async def ping():
+    return {"ok": True}
+
+
 # ─── API ─────────────────────────────────────────────────────────
 
 @app.get("/api/sections")
